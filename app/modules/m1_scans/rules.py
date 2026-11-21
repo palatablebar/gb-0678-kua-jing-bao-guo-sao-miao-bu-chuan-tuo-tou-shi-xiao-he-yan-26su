@@ -1,5 +1,5 @@
 import csv,io
-from app.config import COLUMNS
+from app.config import COLUMNS,OPTIONAL_COLUMNS
 from app.errors import DomainError
 from app.reasons import reject
 def decode(raw):
@@ -7,12 +7,18 @@ def decode(raw):
         try: return raw.decode(encoding),encoding
         except UnicodeDecodeError: continue
     raise DomainError("ENCODING","无法识别文件编码")
+def header_ok(header):
+    """必填列固定在最前；换版附加列只允许按登记顺序追加在其后。"""
+    base=len(COLUMNS)
+    if header[:base]!=COLUMNS:return False
+    extra=header[base:]
+    return extra==OPTIONAL_COLUMNS[:len(extra)]
 def evaluate(raw,context=None):
     text,encoding=decode(raw)
     if not text: raise DomainError("EMPTY_FILE","文件为空")
     if not text.strip(): raise DomainError("BLANK_ONLY","全部为空行")
     stream=csv.reader(io.StringIO(text,newline=""));header=next(stream,None)
-    if header!=COLUMNS: raise DomainError("BAD_HEADER","表头不匹配")
+    if header!=COLUMNS and not header_ok(header or []): raise DomainError("BAD_HEADER","表头不匹配")
     rows=[];bad=[];seen={};duplicate=blank=repeated=count=0
     try:
         for cells in stream:

@@ -20,23 +20,27 @@ docker compose exec -T app pytest -q
 - 5. 时效计算：`/timeliness`，`/api/timeliness`。
 - 6. 赔付对账：`/compensation`，`/api/compensation`。
 - 7. 批次归档：`/archives`，`/api/archives`。
+- 8. 结算台账：`/settlements`，`/api/settlements`（换版与唯一结算裁定）。
 
 ## 核心规则
 
 以事件发生时刻重建路径，补传不改变既有妥投时间；承诺时钟按目的地节假日停表。
 
+承运商换版期间，资格区间按 [start,end) 裁决。空档扫描仍先进入时效计算并给出暂算金额，但来源待核验，不形成正式赔付；新旧账号重复回传的同一扫描只计一次，新账号优先，旧原件保留为未采用凭据。页面、结算台账与导出读取同一份裁定。换版在单事务内完成快照与切换，失败时旧版结算继续有效；同源重跑与重复换版不新增记录、不改正式金额。
+
 ## 演示
 
-1. 打开首页，核对当次计算、差异和隔离原因。
+1. 打开首页，选择「换版·空档批」，核对结算裁定、资格区间与未采用原因。
 2. 切换模块查看源行及裁决依据。
-3. 重跑相同样例，批次号与行数保持一致。
-4. 复核后导出一份证据CSV。版本已变化的复核提交返回409。
+3. 点「提交换版」后进入 `/settlements` 查看唯一生效台账与换版记录。
+4. 重跑相同样例，批次号与行数保持一致。
+5. 复核后导出一份证据CSV。版本已变化的复核提交返回409。
 
 ## 输入与输出
 
-输入列见 `docs/DATA-DICTIONARY.md`。项目包含dirty.csv、clean.csv、legacy.csv，统一走实际导入路径。上传限制4MB，拒绝不带时区的时间。业务键按字符串保留，Decimal参与计算，空值不会当零。
+输入列见 `docs/DATA-DICTIONARY.md`。项目包含dirty.csv、clean.csv、legacy.csv、switch.csv，统一走实际导入路径。上传限制4MB，拒绝不带时区的时间。业务键按字符串保留，Decimal参与计算，空值不会当零。`carrier_version`/`account` 为可选追加列。
 
-`POST /api/runs` 接收sample或csv；`GET /api/runs`返回历史批次；`POST /api/runs/<id>/review`需要version与decision；`GET /api/runs/<id>/archive`返回唯一证据导出。
+`POST /api/runs` 接收sample或csv；`GET /api/runs`返回历史批次；`POST /api/runs/<id>/review`需要version与decision；`POST /api/runs/<id>/switch`事务内换版；`GET /api/settlements`返回唯一结算台账；`GET /api/runs/<id>/archive`返回唯一证据导出。
 
 ## 范围
 

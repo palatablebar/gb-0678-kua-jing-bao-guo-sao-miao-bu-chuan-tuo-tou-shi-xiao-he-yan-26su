@@ -20,6 +20,9 @@ def evaluate(rows,context):
     for row in rows:
         start=instant(row["accepted_at"]);end=instant(row["delivered_at"]) if row.get("delivered_at") else max(start,as_of)
         hours=working_hours(start,end,row["zone"],set(p.get("holidays",{}).get(row["destination"],HOLIDAYS.get(row["destination"],set()))))
-        late=max(Decimal(0),hours-number(row["promised_hours"]));comp=min(number(row["declared_value"])*Decimal("0.10"),late*rate)
-        good.append({**row,"working_hours":str(hours),"late_hours":str(late),"expected":money(comp),"sla":"超时" if late>0 else "达标","clock_end":end.isoformat()})
-    return {"rows":good,"quarantine":[],"metrics":{"parcels":len(good),"late_parcels":sum(r["sla"]=="超时" for r in good),"compensation":money(sum((number(r["expected"]) for r in good),Decimal(0)))}}
+        late=max(Decimal(0),hours-number(row["promised_hours"]));provisional=min(number(row["declared_value"])*Decimal("0.10"),late*rate)
+        pending=row.get("qualification_status")=="pending"
+        # 空档来源仍先计入时效（运营不等），但只形成暂算金额；正式赔付须待核验。
+        official=Decimal(0) if pending else provisional
+        good.append({**row,"working_hours":str(hours),"late_hours":str(late),"expected":money(official),"provisional_expected":money(provisional),"clock_end":end.isoformat(),"sla":"超时" if late>0 else "达标","settlement_status":row.get("settlement_status") or "正式可结算"})
+    return {"rows":good,"quarantine":[],"metrics":{"parcels":len(good),"late_parcels":sum(r["sla"]=="超时" for r in good),"compensation":money(sum((number(r["expected"]) for r in good),Decimal(0))),"provisional_compensation":money(sum((number(r["provisional_expected"]) for r in good),Decimal(0)))}}

@@ -45,6 +45,13 @@ def create_app():
         from app.archive import build_archive
         run=store.get(run_id)
         return application.response_class(build_archive(run),mimetype="text/csv",headers={"Content-Disposition":'attachment; filename="evidence.csv"'})
+    @application.post("/api/runs/<run_id>/switch")
+    def switch(run_id):
+        payload=request.get_json(silent=True) or {}
+        if not isinstance(payload,dict): raise DomainError("BAD_BODY","请求需要对象")
+        return store.switch(run_id,str(payload.get("note","")))
+    @application.get("/api/settlements")
+    def settlements(): return store.current_settlement()
     for index,(slug,title) in enumerate(MODULES,1):
         module=importlib.import_module(f"app.modules.m{index}_{slug}.handler")
         application.register_blueprint(module.bp)
